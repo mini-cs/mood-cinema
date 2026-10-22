@@ -11,8 +11,9 @@ from core.tmdb_client import TmdbClient
 APP = str(Path(__file__).resolve().parent.parent / "app.py")
 
 
-def _media(tmdb_id, media_type="movie", genre_ids=(18,)):
-    return MediaItem(tmdb_id, media_type, f"작품{tmdb_id}", f"Work{tmdb_id}", 2019, 7.85, "줄거리", None, None, genre_ids)
+def _media(tmdb_id, media_type="movie", genre_ids=(18,), title=None):
+    title = title or f"작품{tmdb_id}"
+    return MediaItem(tmdb_id, media_type, title, title, 2019, 7.85, "줄거리", None, None, genre_ids)
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +30,7 @@ def fakes(monkeypatch):
     trending = [_media(i, "movie" if i % 2 else "tv") for i in range(1, 13)]
     monkeypatch.setattr(TmdbClient, "trending", lambda self, media_type, window: trending)
     monkeypatch.setattr(TmdbClient, "genres", lambda self: {18: "드라마", 28: "액션"})
-    monkeypatch.setattr(TmdbClient, "search", lambda self, query, media_type, year=None: [_media(100 + len(query), media_type)])
+    monkeypatch.setattr(TmdbClient, "search", lambda self, query, media_type, year=None: [_media(100 + len(query), media_type, title=query)])
     recs = RecommendationList(
         items=[
             Recommendation(title_ko="기생충", original_title="Parasite", year=2019, media_type="movie", reason="몰입감 최고"),
