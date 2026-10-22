@@ -9,7 +9,7 @@ from dotenv import find_dotenv, load_dotenv
 
 from core.config import load_settings
 from core.models import ConfigError, GeminiError, GeminiFormatError, MediaItem, RateLimitExceeded, TmdbError
-from core.presenter import CardVM, HeroVM, hero_view, recommended_cards, trending_cards
+from core.presenter import CardVM, DetailVM, HeroVM, detail_view, hero_view, recommended_cards, trending_cards
 from core.rate_limit import check_cooldown
 from core.recommender import validate_query
 from core.service import MoodService, build_service
@@ -190,3 +190,40 @@ class RecommendState(State):
                     self.hero = hero_view(result.hero, genre_map) if result.hero else HeroVM()
                     self.cards = recommended_cards(result.others)
                 self.loading = False
+
+
+class DetailState(State):
+    open: bool = False
+    loading: bool = False
+    error: str = ""
+    view: DetailVM = DetailVM()
+
+    _request: str = ""  # 지금 열려 있는 작품. 늦게 끝난 이전 요청이 덮어쓰지 않게 비교한다
+
+    @rx.event(background=True)
+    async def open_detail(self, media_type: str, tmdb_id: int, reason: str):
+        request = f"{media_type}-{tmdb_id}"
+        async with self:
+            # 열 때마다 비운다: B가 실패해도 이전에 본 A 내용이 남지 않게
+            self.view, self.loading, self.error, self.open = DetailVM(), True, "", True
+            self._request = request
+
+        view, error = None, ""
+        try:
+            service = get_service()
+            if service is None:
+                raise ConfigError("TMDB_API_KEY가 설정되지 않았어요")
+            view = detail_view(await asyncio.to_thread(service.detail, tmdb_id, media_type), reason)
+        except (TmdbError, ConfigError):
+            logger.exception("상세 조회 실패")
+            error = "상세 정보를 불러오지 못했어요"
+        finally:
+            async with self:
+                if self._request == request:
+                    self.view = view or DetailVM()
+                    self.error = error
+                    self.loading = False
+
+    @rx.event
+    def set_open(self, value: bool):
+        self.open = value

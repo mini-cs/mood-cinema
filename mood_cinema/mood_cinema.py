@@ -1,6 +1,7 @@
 import reflex as rx
 
 from mood_cinema import styles
+from mood_cinema.components.detail_dialog import detail_dialog
 from mood_cinema.components.footer import footer
 from mood_cinema.components.header import header
 from mood_cinema.components.recommend import recommend_section
@@ -32,6 +33,7 @@ def setup_notice() -> rx.Component:
 def index() -> rx.Component:
     return rx.box(
         header(),
+        detail_dialog(),
         rx.vstack(
             setup_notice(),
             # 추천은 TMDB·Gemini 키가 모두 있어야 보인다
