@@ -1,13 +1,17 @@
 import asyncio
 import functools
 import logging
+import math
+import time
 
 import reflex as rx
 from dotenv import find_dotenv, load_dotenv
 
 from core.config import load_settings
-from core.models import ConfigError, MediaItem, TmdbError
-from core.presenter import CardVM, trending_cards
+from core.models import ConfigError, GeminiError, GeminiFormatError, MediaItem, RateLimitExceeded, TmdbError
+from core.presenter import CardVM, HeroVM, hero_view, recommended_cards, trending_cards
+from core.rate_limit import check_cooldown
+from core.recommender import validate_query
 from core.service import MoodService, build_service
 from core.tmdb_client import filter_by_genre
 
@@ -98,3 +102,91 @@ class TrendingState(State):
         self.genre = name
         # API를 다시 부르지 않고 이미 받은 이번 주 인기에서 다시 거른다
         self.genre_pick = trending_cards(filter_by_genre(self._week_items, name, self._genre_map), "genre", ranked=False)
+
+
+def _rate_limit_message(e: RateLimitExceeded) -> str:
+    if e.reason == "cooldown":
+        return f"{math.ceil(e.retry_after_sec)}초 후에 다시 추천받을 수 있어요"
+    return "지금 요청이 많아요. 잠시 후 다시 시도해 주세요"
+
+
+class RecommendState(State):
+    query: str = ""
+    loading: bool = False
+    warning: str = ""
+    error: str = ""
+    can_retry: bool = False
+    has_hero: bool = False
+    hero: HeroVM = HeroVM()
+    cards: list[CardVM] = []
+
+    _last_recommend_at: float | None = None
+    _last_query: str = ""
+
+    @rx.event
+    def set_query(self, text: str):
+        self.query = text
+
+    @rx.event
+    def use_example(self, text: str):
+        self.query = text  # 입력창만 채운다. 바로 요청하지 않는다
+
+    @rx.event(background=True)
+    async def submit(self):
+        async with self:
+            text = self.query
+        await self._recommend(text)
+
+    @rx.event(background=True)
+    async def retry(self):
+        async with self:
+            text = self._last_query
+        await self._recommend(text)
+
+    async def _recommend(self, text: str):
+        async with self:
+            if self.loading:
+                return  # 로딩 중 연타: 요청은 한 번만
+            self.warning, self.error, self.can_retry = "", "", False
+            try:
+                query = validate_query(text)
+                check_cooldown(self._last_recommend_at, time.time(), load_settings().recommend_cooldown_sec)
+            except ValueError as e:
+                self.warning = str(e)
+                return
+            except RateLimitExceeded as e:
+                self.warning = _rate_limit_message(e)
+                return
+            self._last_recommend_at = time.time()
+            self._last_query = query
+            self.loading = True
+
+        result, genre_map = None, {}
+        warning, error, can_retry = "", "", False
+        try:
+            service = get_service()
+            if service is None:
+                raise ConfigError("TMDB_API_KEY가 설정되지 않았어요")
+            result = await asyncio.to_thread(service.recommend, query)
+            genre_map = await asyncio.to_thread(service.genres)
+        except RateLimitExceeded as e:
+            warning = _rate_limit_message(e)
+        except GeminiFormatError:
+            logger.exception("Gemini 응답 형식 오류")
+            error, can_retry = "추천 결과를 읽지 못했어요", True
+        except GeminiError:
+            logger.exception("Gemini 호출 실패")
+            warning = "AI 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요"
+        except TmdbError:
+            logger.exception("TMDB 장르 조회 실패")  # 추천은 받았으니 장르 없이 보여준다
+        except ConfigError as e:
+            warning = str(e)
+        finally:
+            # 예상 못한 예외가 나도 버튼이 '로딩 중'으로 잠긴 채 남지 않게 한다
+            async with self:
+                self.warning, self.error, self.can_retry = warning, error, can_retry
+                if result is not None:
+                    self.has_hero = result.hero is not None
+                    self.hero = hero_view(result.hero, genre_map) if result.hero else HeroVM()
+                    self.cards = recommended_cards(result.others)
+                self.loading = False
