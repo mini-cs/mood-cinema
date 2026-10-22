@@ -1,12 +1,12 @@
 # Mood Cinema
 
 기분·상황 문장 → Gemini가 작품 추천 → TMDB 실제 데이터로 보강해 보여주는 웹 앱 (개인 포트폴리오).
-v0.2(Streamlit)는 완료했고, 지금은 v0.3에서 화면을 **Reflex**로 바꾸는 중이다.
+v0.2(Streamlit)를 거쳐 v0.3에서 화면을 **Reflex**로 바꿨다. Streamlit 코드(`app.py`, `.streamlit/`)는 삭제했다.
 
 ## 먼저 읽을 문서
 
 - 설계 문서 (v0.3): `docs/specs/2026-10-22-mood-cinema-design.md`
-- 지금 진행할 계획 (Reflex 전환, Task 1~5): `docs/plans/2026-10-22-mood-cinema-reflex.md`
+- 완료된 계획 (Reflex 전환, Task 1~5): `docs/plans/2026-10-22-mood-cinema-reflex.md`
 - 완료된 계획 (Streamlit, Task 1~6): `docs/plans/2026-10-22-mood-cinema.md`
 
 ## 작업 규칙
@@ -56,6 +56,6 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements-dev.txt
 pytest -v
-reflex run                                # Reflex Task 3부터. 그 전까지는 streamlit run app.py
+reflex run                                # http://localhost:3000
 reflex export --frontend-only --no-zip    # 화면 코드 빌드 확인
 ```

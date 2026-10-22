@@ -43,7 +43,7 @@ def _body(card, show_reason: bool) -> rx.Component:
 
 def poster_card(card, *, show_reason: bool = False, on_open: Callable | None = None) -> rx.Component:
     """카드 하나. 이벤트를 조건부로 붙일 수 없어서 rx.cond로 '누르는 카드'와 '정적 카드' 두 갈래를 만든다."""
-    events = {"on_click": on_open(card)} if on_open else {}  # 상세 팝업은 Task 5에서 연결
+    events = {"on_click": on_open(card)} if on_open else {}
     clickable = rx.box(
         _body(card, show_reason),
         **events,

@@ -2,7 +2,7 @@ import reflex as rx
 
 from mood_cinema import styles
 from mood_cinema.components.card import poster_card
-from mood_cinema.state import RecommendState
+from mood_cinema.state import DetailState, RecommendState
 
 EXAMPLES = [
     "비 오는 날 혼자 보기 좋은 몰입감 있는 스릴러",
@@ -31,7 +31,12 @@ def _hero_text(hero) -> rx.Component:
         rx.heading(hero.title, size="8", color=styles.TEXT),
         rx.text(hero.meta, size="2", color=styles.MUTED),
         reason_box(hero.reason),
-        rx.button("상세 보기", size="3", variant="soft"),  # 상세 팝업은 Task 5에서 연결
+        rx.button(
+            "상세 보기",
+            size="3",
+            variant="soft",
+            on_click=DetailState.open_detail(hero.media_type, hero.tmdb_id, hero.reason),
+        ),
         spacing="3",
         align="start",
         width="100%",
@@ -140,7 +145,17 @@ def _results() -> rx.Component:
             RecommendState.cards.length() > 0,
             rx.box(
                 rx.hstack(
-                    rx.foreach(RecommendState.cards, lambda c: rx.box(poster_card(c, show_reason=True), flex_shrink="0")),
+                    rx.foreach(
+                        RecommendState.cards,
+                        lambda c: rx.box(
+                            poster_card(
+                                c,
+                                show_reason=True,
+                                on_open=lambda card: DetailState.open_detail(card.media_type, card.tmdb_id, card.reason),
+                            ),
+                            flex_shrink="0",
+                        ),
+                    ),
                     spacing="4",
                     padding="6px 4px 12px",
                     align="start",

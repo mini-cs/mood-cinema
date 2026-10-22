@@ -2,7 +2,7 @@ import reflex as rx
 
 from mood_cinema import styles
 from mood_cinema.components.card import poster_card
-from mood_cinema.state import MEDIA_TYPES, TrendingState
+from mood_cinema.state import MEDIA_TYPES, DetailState, TrendingState
 
 
 def _skeleton_row() -> rx.Component:
@@ -31,7 +31,7 @@ def _rank_badge(card) -> rx.Component:
 
 
 def _row_item(card, ranked: bool) -> rx.Component:
-    children = [poster_card(card)]
+    children = [poster_card(card, on_open=lambda c: DetailState.open_detail(c.media_type, c.tmdb_id, c.reason))]
     if ranked:  # 오늘·이번 주 줄만 포스터 왼쪽 위에 순위 숫자
         children.append(_rank_badge(card))
     return rx.box(*children, position="relative", flex_shrink="0", scroll_snap_align="start")
