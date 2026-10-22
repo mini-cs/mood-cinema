@@ -79,3 +79,41 @@ def test_cooldown_message_on_quick_resubmit(fakes):
     _submit(at, "주말 가족 드라마")
     assert not at.exception
     assert any("초 후에 다시 추천받을 수 있어요" in w.value for w in at.warning)
+
+
+def test_format_error_then_retry_button(fakes, monkeypatch):
+    from core.models import GeminiFormatError
+
+    good = GeminiClient.recommend  # fakes가 넣은 가짜
+    calls = []
+
+    def flaky(self, user_text):
+        calls.append(user_text)
+        if len(calls) == 1:
+            raise GeminiFormatError("Gemini 응답 형식 오류")
+        return good(self, user_text)
+
+    monkeypatch.setattr(GeminiClient, "recommend", flaky)
+    at = _app_with_keys()
+    at.secrets["RECOMMEND_COOLDOWN_SEC"] = 0
+    at.run()
+    _submit(at, "비 오는 날 스릴러")
+    assert any("추천 결과를 읽지 못했어요" in e.value for e in at.error)
+
+    next(b for b in at.button if b.label == "다시 시도").click()
+    at.run()
+    assert not at.exception
+    assert calls == ["비 오는 날 스릴러", "비 오는 날 스릴러"]
+    assert not at.error
+    assert any("AI 큐레이터의 한마디" in m.value for m in at.markdown)
+
+
+def test_rpm_limit_message(fakes):
+    at = _app_with_keys()
+    at.secrets["RECOMMEND_COOLDOWN_SEC"] = 0
+    at.secrets["GEMINI_RPM_LIMIT"] = 1
+    at.run()
+    _submit(at, "비 오는 날 스릴러")
+    _submit(at, "주말 가족 드라마")
+    assert not at.exception
+    assert any("지금 요청이 많아요. 잠시 후 다시 시도해 주세요" in w.value for w in at.warning)
