@@ -3,6 +3,7 @@ import reflex as rx
 from mood_cinema import styles
 from mood_cinema.components.footer import footer
 from mood_cinema.components.header import header
+from mood_cinema.components.recommend import recommend_section
 from mood_cinema.components.trending import trending_section
 from mood_cinema.state import State, TrendingState
 
@@ -33,6 +34,12 @@ def index() -> rx.Component:
         header(),
         rx.vstack(
             setup_notice(),
+            # 추천은 TMDB·Gemini 키가 모두 있어야 보인다
+            rx.cond(
+                State.missing_keys.contains("TMDB_API_KEY") | State.missing_keys.contains("GEMINI_API_KEY"),
+                rx.fragment(),
+                recommend_section(),
+            ),
             # TMDB 키가 없으면 트렌딩을 숨긴다
             rx.cond(State.missing_keys.contains("TMDB_API_KEY"), rx.fragment(), trending_section()),
             footer(),
