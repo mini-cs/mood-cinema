@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Literal
 
@@ -21,12 +22,26 @@ def validate_query(text: str) -> str:
     return query
 
 
+def _title_key(title: str) -> str:
+    """대소문자·공백·문장부호를 무시하고 비교하기 위한 키. "Nine-Nine" == "nine nine"."""
+    return re.sub(r"[\W_]+", "", title).casefold()
+
+
+def _pick(results: list[MediaItem], rec: Recommendation) -> MediaItem | None:
+    # 검색 1등이 엉뚱한 작품일 수 있다 ("Seven" → 황야의 7인). 제목이 실제로 같은 결과만 받고, 그중 연도가 맞는 것을 먼저 고른다
+    names = {_title_key(rec.original_title), _title_key(rec.title_ko)} - {""}
+    matched = [m for m in results if names & {_title_key(m.title), _title_key(m.original_title)}]
+    same_year = [m for m in matched if rec.year and m.year == rec.year]
+    return (same_year or matched or [None])[0]
+
+
 def match_title(rec: Recommendation, search: SearchFn) -> MediaItem | None:
     try:
-        results = search(rec.original_title, rec.media_type, rec.year) or search(rec.title_ko, rec.media_type, None)
+        return _pick(search(rec.original_title, rec.media_type, rec.year), rec) or _pick(
+            search(rec.title_ko, rec.media_type, None), rec
+        )
     except TmdbError:
         return None
-    return results[0] if results else None
 
 
 def build_result(recs: RecommendationList, search: SearchFn) -> RecommendationResult:
