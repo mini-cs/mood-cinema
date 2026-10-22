@@ -34,6 +34,14 @@
 
 ---
 
+## Branch Workflow
+
+Task 하나 = 기능 브랜치 하나. 앞 Task를 `main`에 머지한 뒤 최신 `main`에서 다음 브랜치를 만든다. 머지 조건은 `pytest -v` 전체 통과. 자세한 명령은 `CLAUDE.md` 참고.
+
+`feat/01-scaffold-config` → `feat/02-rate-limit` → `feat/03-tmdb-client` → `feat/04-gemini-client` → `feat/05-recommender` → `feat/06-streamlit-ui`
+
+---
+
 ## File Structure
 
 | 파일 | 책임 |
