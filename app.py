@@ -1,3 +1,4 @@
+import itertools
 import logging
 import math
 import time
@@ -95,8 +96,21 @@ def genre_names_of(media: MediaItem, genre_map: dict[int, str]) -> list[str]:
     return [genre_map[g] for g in media.genre_ids if g in genre_map][:2]
 
 
+_box_ids = itertools.count()  # 스크립트가 다시 돌 때마다 0부터 → 한 화면 안에서 key가 겹치지 않는다
+
+
+def box():
+    # 테두리 박스는 배경을 칠하지 않으므로, key로 붙는 st-key-box-N 클래스에 inject_css()가 카드 배경을 입힌다
+    return st.container(border=True, key=f"box-{next(_box_ids)}")
+
+
+def inject_css() -> None:
+    bg = st.get_option("theme.secondaryBackgroundColor")
+    st.html(f'<style>[class*="st-key-box-"] {{ background-color: {bg}; }}</style>')
+
+
 def render_reason_box(reason: str) -> None:
-    with st.container(border=True):
+    with box():
         st.markdown("**🎬 AI 큐레이터의 한마디**")
         st.write(reason)
 
@@ -138,18 +152,19 @@ def show_detail(media: MediaItem, reason: str | None) -> None:
 
 
 def render_card(media: MediaItem | None, title: str, reason: str | None, key: str) -> None:
-    poster = image_url(media.poster_path, "w342") if media else None
-    if poster:
-        st.image(poster)
-    else:
-        st.caption("정보 없음")
-    st.markdown(f"**{title}**")
-    if media:
-        st.caption(meta_line(media))
-    if reason:
-        st.caption(reason)
-    if media and st.button("상세 보기", key=f"{key}-{media.media_type}-{media.tmdb_id}"):
-        show_detail(media, reason)
+    with box():
+        poster = image_url(media.poster_path, "w342") if media else None
+        if poster:
+            st.image(poster)
+        else:
+            st.caption("정보 없음")
+        st.markdown(f"**{title}**")
+        if media:
+            st.caption(meta_line(media))
+        if reason:
+            st.caption(reason)
+        if media and st.button("상세 보기", key=f"{key}-{media.media_type}-{media.tmdb_id}"):
+            show_detail(media, reason)
 
 
 def render_hero(item: RecommendedItem, genre_map: dict[int, str]) -> None:
@@ -204,7 +219,7 @@ def render_recommend_section(genre_map: dict[int, str]) -> None:
     st.subheader("AI 추천")
     with st.form("recommend_form"):
         text = st.text_area("지금 기분이나 상황을 적어 주세요", placeholder=EXAMPLES[0])
-        submitted = st.form_submit_button("추천받기")
+        submitted = st.form_submit_button("추천받기", type="primary")
     st.caption("예시: " + " / ".join(EXAMPLES))
 
     if submitted:
@@ -277,6 +292,7 @@ def render_credits() -> None:
 
 
 st.set_page_config(page_title="Mood Cinema", page_icon="🎬", layout="wide")
+inject_css()
 load_dotenv(find_dotenv(usecwd=True))  # 실행 위치 기준으로 .env를 찾는다
 
 try:
